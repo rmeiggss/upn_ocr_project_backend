@@ -13,8 +13,12 @@ public class LocalBlobStorageService : IBlobStorageService
 
     public LocalBlobStorageService(IConfiguration configuration)
     {
-        _baseStoragePath = configuration["BlobStorage:LocalPath"]
-            ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Storage", "Blobs");
+        var basePath = configuration["BlobStorage:LocalPath"];
+        if (string.IsNullOrWhiteSpace(basePath))
+        {
+            basePath = Path.Combine(Path.GetTempPath(), "ShohinStorage", "Blobs");
+        }
+        _baseStoragePath = basePath;
 
         _baseUrl = configuration["BlobStorage:BaseUrl"] ?? "/api/documentos/archivo/";
 

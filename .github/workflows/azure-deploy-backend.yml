@@ -1,4 +1,4 @@
-name: Deploy Backend (.NET 10 Web API) to Azure Functions / App Service
+name: Deploy Backend (.NET 8 Azure Functions) to Azure Cloud
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_NAME: 'shohin-func-prod-j3ybai'
-  DOTNET_VERSION: '10.0.x'
+  DOTNET_VERSION: '8.0.x'
   PROJECT_PATH: 'src/Shohin.Api/Shohin.Api.csproj'
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
     - name: 📥 Clonar Repositorio
       uses: actions/checkout@v4
 
-    - name: ⚙️ Configurar Entorno .NET 10
+    - name: ⚙️ Configurar Entorno .NET 8 (LTS)
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
@@ -31,13 +31,32 @@ jobs:
     - name: 🔨 Compilar Solución (Release)
       run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
 
-    - name: 🚀 Publicar Artefactos
-      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ./publish
+    - name: 🚀 Publicar Artefactos (Linux x64)
+      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release -r linux-x64 --no-self-contained --output ./publish
 
-    - name: ☁️ Desplegar en Azure Functions
-      if: github.ref == 'refs/heads/main'
+    - name: 🔑 Iniciar Sesión en Azure CLI (Si está configurado)
+      if: github.ref == 'refs/heads/main' && env.HAS_AZ_CREDS == 'true'
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      env:
+        HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+
+    - name: ☁️ Desplegar mediante Azure CLI (Recomendado para Linux Consumption)
+      if: github.ref == 'refs/heads/main' && env.HAS_AZ_CREDS == 'true'
+      run: |
+        cd ./publish && zip -r ../function.zip . && cd ..
+        az functionapp deployment source config-zip -g rg-shohin-prod-centralus -n ${{ env.AZURE_FUNCTIONAPP_NAME }} --src function.zip
+      env:
+        HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+
+    - name: ☁️ Desplegar con Publish Profile (Fallback)
+      if: github.ref == 'refs/heads/main' && env.HAS_AZ_CREDS != 'true' && env.HAS_PUB_PROFILE == 'true'
       uses: Azure/functions-action@v1
       with:
         app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
         package: ./publish
+      env:
+        HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        HAS_PUB_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE != '' }}

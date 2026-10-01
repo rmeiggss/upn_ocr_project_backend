@@ -1,15 +1,21 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
 using Shohin.Api.Middlewares;
 using Shohin.Application;
 using Shohin.Application.Interfaces;
 using Shohin.Infrastructure;
 using Shohin.Infrastructure.Persistence;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = FunctionsApplication.CreateBuilder(args);
+
+builder.ConfigureFunctionsWebApplication();
 
 // 1. Inyección de Capas de la Clean Architecture
 builder.Services.AddApplicationServices();
@@ -81,12 +87,13 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// 6. Migración y Sembrado Automático de Base de Datos
-using (var scope = app.Services.CreateScope())
+// 6. Migración y Sembrado Automático de Base de Datos en segundo plano (para no bloquear el handshake gRPC de Azure Functions)
+_ = Task.Run(async () =>
 {
-    var services = scope.ServiceProvider;
     try
     {
+        using var scope = app.Services.CreateScope();
+        var services = scope.ServiceProvider;
         var dbContext = services.GetRequiredService<ApplicationDbContext>();
         var jwtService = services.GetRequiredService<IJwtService>();
 
@@ -99,26 +106,9 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Error durante la inicialización de la base de datos.");
+        var logger = app.Services.GetService<ILogger<Program>>();
+        logger?.LogError(ex, "Error durante la inicialización de la base de datos en segundo plano.");
     }
-}
-
-// 7. Pipeline de Ejecución HTTP
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-
-app.UseSwagger();
-app.UseSwaggerUI(c =>
-{
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Shohin API v1");
-    c.RoutePrefix = string.Empty; // Swagger en la raíz "/"
 });
 
-app.UseCors("AllowAll");
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+await app.RunAsync();
