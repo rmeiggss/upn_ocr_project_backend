@@ -34,9 +34,9 @@ jobs:
     - name: 🚀 Publicar Artefactos
       run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ./publish
 
-    - name: ☁️ Desplegar en Azure (Function App / Web App)
+    - name: ☁️ Desplegar en Azure Functions
       if: github.ref == 'refs/heads/main'
-      uses: azure/webapps-deploy@v3
+      uses: Azure/functions-action@v1
       with:
         app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
