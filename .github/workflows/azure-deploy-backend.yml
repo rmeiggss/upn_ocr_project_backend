@@ -1,0 +1,43 @@
+name: Deploy Backend (.NET 10 Web API) to Azure Functions / App Service
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_NAME: 'shohin-func-prod-j3ybai'
+  DOTNET_VERSION: '10.0.x'
+  PROJECT_PATH: 'src/Shohin.Api/Shohin.Api.csproj'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Clonar Repositorio
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Configurar Entorno .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 📦 Restaurar Dependencias NuGet
+      run: dotnet restore ${{ env.PROJECT_PATH }}
+
+    - name: 🔨 Compilar Solución (Release)
+      run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+
+    - name: 🚀 Publicar Artefactos
+      run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ./publish
+
+    - name: ☁️ Desplegar en Azure (Function App / Web App)
+      if: github.ref == 'refs/heads/main'
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+        package: ./publish
