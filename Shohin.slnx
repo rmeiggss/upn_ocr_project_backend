@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Shohin.Api/Shohin.Api.csproj" />
+    <Project Path="src/Shohin.Application/Shohin.Application.csproj" />
+    <Project Path="src/Shohin.Domain/Shohin.Domain.csproj" />
+    <Project Path="src/Shohin.Infrastructure/Shohin.Infrastructure.csproj" />
+    <Project Path="src/Shohin.Worker.Local/Shohin.Worker.Local.csproj" />
+  </Folder>
+</Solution>

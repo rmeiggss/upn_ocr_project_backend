@@ -1,0 +1,6 @@
+@Shohin.Api_HostAddress = http://localhost:5134
+
+GET {{Shohin.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
