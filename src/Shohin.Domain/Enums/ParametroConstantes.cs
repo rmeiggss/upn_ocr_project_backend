@@ -37,6 +37,7 @@ public static class ParametroConstantes
 
     public static class EstadoDocumento
     {
+        public const string Pendiente = "PENDIENTE";
         public const string Correcto = "CORRECTO";
         public const string Observado = "OBSERVADO";
         public const string Reprocesar = "REPROCESAR";

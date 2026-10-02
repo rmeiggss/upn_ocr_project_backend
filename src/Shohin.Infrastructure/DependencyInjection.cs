@@ -16,7 +16,15 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IJwtService, JwtService>();
-        services.AddScoped<IBlobStorageService, LocalBlobStorageService>();
+        var blobProvider = configuration["BlobStorage:Provider"];
+        if (string.Equals(blobProvider, "Azure", System.StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
+        }
+        else
+        {
+            services.AddScoped<IBlobStorageService, LocalBlobStorageService>();
+        }
         services.AddScoped<IOcrService, MockOcrService>();
 
         var connectionString = configuration.GetConnectionString("DefaultConnection");

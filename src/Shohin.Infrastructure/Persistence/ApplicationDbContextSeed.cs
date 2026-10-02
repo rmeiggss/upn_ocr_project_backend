@@ -30,6 +30,7 @@ public static class ApplicationDbContextSeed
                 new Parametro { Grupo = ParametroConstantes.Grupos.EstadoTicket, Clave = ParametroConstantes.EstadoTicket.Procesado, Valor = "OCR completado y disponible para revisión" },
                 new Parametro { Grupo = ParametroConstantes.Grupos.EstadoTicket, Clave = ParametroConstantes.EstadoTicket.Observado, Valor = "Lote observado o discrepancia en conteo físico" },
 
+                new Parametro { Grupo = ParametroConstantes.Grupos.EstadoDocumento, Clave = ParametroConstantes.EstadoDocumento.Pendiente, Valor = "Documento subido a la nube en espera de procesamiento OCR" },
                 new Parametro { Grupo = ParametroConstantes.Grupos.EstadoDocumento, Clave = ParametroConstantes.EstadoDocumento.Correcto, Valor = "Documento validado y conforme con alta confianza" },
                 new Parametro { Grupo = ParametroConstantes.Grupos.EstadoDocumento, Clave = ParametroConstantes.EstadoDocumento.Observado, Valor = "Campos con baja confianza o inconsistencia numérica" },
                 new Parametro { Grupo = ParametroConstantes.Grupos.EstadoDocumento, Clave = ParametroConstantes.EstadoDocumento.Reprocesar, Valor = "Documento borroso/manchado devuelto a archivo" },
