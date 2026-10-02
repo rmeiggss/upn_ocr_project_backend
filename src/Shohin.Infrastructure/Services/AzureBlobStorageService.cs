@@ -41,24 +41,35 @@ public class AzureBlobStorageService : IBlobStorageService
     {
         try
         {
-            var uri = new Uri(rutaBlob);
-            var blobClient = new BlobClient(uri);
-
-            if (!await blobClient.ExistsAsync())
+            BlobClient blobClient;
+            if (Uri.TryCreate(rutaBlob, UriKind.Absolute, out var uri) && uri.Scheme.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             {
-                // Intentar resolver relativo al defaultContainer
-                var containerClient = _blobServiceClient.GetBlobContainerClient(_defaultContainer);
-                var relativeBlobClient = containerClient.GetBlobClient(rutaBlob.Trim('/'));
-                if (await relativeBlobClient.ExistsAsync())
+                var segments = uri.Segments;
+                if (segments.Length >= 2)
                 {
-                    var response = await relativeBlobClient.DownloadStreamingAsync();
-                    return response.Value.Content;
+                    var containerName = segments[1].Trim('/');
+                    var blobName = string.Join("", segments.Skip(2));
+                    var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+                    blobClient = containerClient.GetBlobClient(blobName);
                 }
-                return null;
+                else
+                {
+                    var containerClient = _blobServiceClient.GetBlobContainerClient(_defaultContainer);
+                    blobClient = containerClient.GetBlobClient(rutaBlob.Trim('/'));
+                }
+            }
+            else
+            {
+                var containerClient = _blobServiceClient.GetBlobContainerClient(_defaultContainer);
+                blobClient = containerClient.GetBlobClient(rutaBlob.Trim('/'));
             }
 
-            var downloadResponse = await blobClient.DownloadStreamingAsync();
-            return downloadResponse.Value.Content;
+            if (await blobClient.ExistsAsync())
+            {
+                var response = await blobClient.DownloadStreamingAsync();
+                return response.Value.Content;
+            }
+            return null;
         }
         catch
         {
@@ -70,8 +81,29 @@ public class AzureBlobStorageService : IBlobStorageService
     {
         try
         {
-            var uri = new Uri(rutaBlob);
-            var blobClient = new BlobClient(uri);
+            BlobClient blobClient;
+            if (Uri.TryCreate(rutaBlob, UriKind.Absolute, out var uri) && uri.Scheme.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                var segments = uri.Segments;
+                if (segments.Length >= 2)
+                {
+                    var containerName = segments[1].Trim('/');
+                    var blobName = string.Join("", segments.Skip(2));
+                    var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+                    blobClient = containerClient.GetBlobClient(blobName);
+                }
+                else
+                {
+                    var containerClient = _blobServiceClient.GetBlobContainerClient(_defaultContainer);
+                    blobClient = containerClient.GetBlobClient(rutaBlob.Trim('/'));
+                }
+            }
+            else
+            {
+                var containerClient = _blobServiceClient.GetBlobContainerClient(_defaultContainer);
+                blobClient = containerClient.GetBlobClient(rutaBlob.Trim('/'));
+            }
+
             var result = await blobClient.DeleteIfExistsAsync();
             return result.Value;
         }
