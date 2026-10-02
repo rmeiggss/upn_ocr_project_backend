@@ -96,20 +96,22 @@ public class Worker : BackgroundService
             if (stoppingToken.IsCancellationRequested) break;
 
             var nombreArchivo = Path.GetFileName(archivoRuta);
-            _logger.LogInformation("Procesando y extrayendo OCR para: {Nombre}", nombreArchivo);
+            _logger.LogInformation("📤 Ingestando y transfiriendo a Azure Blob Storage: {Nombre}", nombreArchivo);
 
             try
             {
                 using (var stream = File.OpenRead(archivoRuta))
                 {
-                    var docResult = await digitalizacionService.ProcesarDocumentoIndividualAsync(idTicket, stream, nombreArchivo);
+                    // Se sube a Azure Blob Storage y se registra encolado. NO ejecuta OCR localmente.
+                    // La creación del blob en la nube engatillará el evento para que la Azure Function ejecute el OCR en la nube.
+                    var docResult = await digitalizacionService.IngestarDocumentoPendienteAsync(idTicket, stream, nombreArchivo);
                     if (docResult.Exito)
                     {
-                        _logger.LogInformation("✅ Documento {Nombre} procesado. Estado: {Estado}", nombreArchivo, docResult.Datos?.Estado);
+                        _logger.LogInformation("☁️ Documento {Nombre} subido a la nube. Estado: {Estado}. Esperando engatillado por evento en Azure.", nombreArchivo, docResult.Datos?.Estado);
                     }
                     else
                     {
-                        _logger.LogWarning("⚠️ Error al procesar {Nombre}: {Msg}", nombreArchivo, docResult.Mensaje);
+                        _logger.LogWarning("⚠️ Error al transferir documento {Nombre}: {Msg}", nombreArchivo, docResult.Mensaje);
                     }
                 }
 
