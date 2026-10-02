@@ -285,7 +285,59 @@ public class DigitalizacionService
             .FirstOrDefaultAsync(d => d.RutaBlobStorage == rutaBlobOUrl || (!string.IsNullOrEmpty(d.NombreArchivo) && rutaBlobOUrl.Contains(d.NombreArchivo)));
 
         if (doc == null)
-            return ApiResponse<DocumentoDto>.Fail($"Documento no encontrado para el blob: {rutaBlobOUrl}");
+        {
+            // Auto-crear el registro resiliente si el documento no fue registrado previamente en la BD
+            var nombreExtraido = Path.GetFileName(Uri.TryCreate(rutaBlobOUrl, UriKind.Absolute, out var u) ? u.LocalPath : rutaBlobOUrl);
+            if (nombreExtraido.Contains('_'))
+            {
+                var partes = nombreExtraido.Split('_', 2);
+                if (partes.Length == 2 && partes[0].Length == 32)
+                {
+                    nombreExtraido = partes[1];
+                }
+            }
+
+            var ticketAuto = await _context.Tickets.FirstOrDefaultAsync(t => t.CodigoTicket == "TCK-CLOUD-EVENT");
+            if (ticketAuto == null)
+            {
+                var estadoProcesandoParam = await _context.Parametros
+                    .FirstOrDefaultAsync(p => p.Grupo == ParametroConstantes.Grupos.EstadoTicket && p.Clave == ParametroConstantes.EstadoTicket.Procesando)
+                    ?? await _context.Parametros.FirstAsync();
+
+                ticketAuto = new TicketDigitalizacion
+                {
+                    CodigoTicket = "TCK-CLOUD-EVENT",
+                    TotalDocumentosEsperados = 1,
+                    TotalDocumentosProcesados = 0,
+                    IdEstadoParametro = estadoProcesandoParam.IdParametro,
+                    Observaciones = "Lote generado automáticamente por Event Grid Cloud Trigger"
+                };
+                _context.Tickets.Add(ticketAuto);
+                await _context.SaveChangesAsync();
+            }
+
+            var tipoDocInicial = await _context.Parametros
+                .FirstOrDefaultAsync(p => p.Grupo == ParametroConstantes.Grupos.TipoDocumento && p.Clave == ParametroConstantes.TipoDocumento.Factura)
+                ?? await _context.Parametros.FirstAsync();
+
+            var estadoPendiente = await _context.Parametros
+                .FirstOrDefaultAsync(p => p.Grupo == ParametroConstantes.Grupos.EstadoDocumento && p.Clave == ParametroConstantes.EstadoDocumento.Pendiente)
+                ?? await _context.Parametros.FirstAsync();
+
+            doc = new DocumentoContable
+            {
+                IdTicket = ticketAuto.IdTicket,
+                IdParametroTipoDocumento = tipoDocInicial.IdParametro,
+                IdEstadoParametro = estadoPendiente.IdParametro,
+                RutaBlobStorage = rutaBlobOUrl,
+                NombreArchivo = nombreExtraido,
+                HashIntegridad = "cloud-event-grid"
+            };
+
+            _context.Documentos.Add(doc);
+            ticketAuto.TotalDocumentosProcesados += 1;
+            await _context.SaveChangesAsync();
+        }
 
         if (string.IsNullOrWhiteSpace(doc.RutaBlobStorage))
             return ApiResponse<DocumentoDto>.Fail("El documento no tiene una ruta de Blob Storage válida.");

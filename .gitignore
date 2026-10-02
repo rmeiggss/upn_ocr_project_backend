@@ -23,6 +23,8 @@ bld/
 [Ll]og/
 [Ll]ogs/
 .vs/
+App_Data/
+ScanStation/
 
 # .NET Core
 project.lock.json

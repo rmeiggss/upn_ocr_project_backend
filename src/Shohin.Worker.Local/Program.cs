@@ -1,5 +1,7 @@
 using Shohin.Application;
+using Shohin.Application.Interfaces;
 using Shohin.Infrastructure;
+using Shohin.Infrastructure.Persistence;
 using Shohin.Worker.Local;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -12,4 +14,13 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
+
+// Sembrar catálogo de parámetros iniciales en la base de datos
+using (var scope = host.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var jwtService = scope.ServiceProvider.GetRequiredService<IJwtService>();
+    await ApplicationDbContextSeed.SeedAsync(dbContext, jwtService);
+}
+
 host.Run();
