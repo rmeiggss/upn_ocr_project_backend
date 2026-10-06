@@ -16,7 +16,8 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IJwtService, JwtService>();
-        var blobProvider = configuration["BlobStorage:Provider"];
+        services.AddScoped<IErpAntiguoService, ErpAntiguoService>();
+        var blobProvider = configuration["BlobStorage:Provider"] ?? configuration["BlobStorage__Provider"] ?? "Azure";
         if (string.Equals(blobProvider, "Azure", System.StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
@@ -25,7 +26,16 @@ public static class DependencyInjection
         {
             services.AddScoped<IBlobStorageService, LocalBlobStorageService>();
         }
-        services.AddScoped<IOcrService, MockOcrService>();
+        services.AddScoped<MockOcrService>();
+        var ocrProvider = configuration["Ocr:Provider"] ?? configuration["Ocr__Provider"] ?? "Azure";
+        if (string.Equals(ocrProvider, "Azure", System.StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IOcrService, AzureDocumentIntelligenceService>();
+        }
+        else
+        {
+            services.AddScoped<IOcrService, MockOcrService>();
+        }
 
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 

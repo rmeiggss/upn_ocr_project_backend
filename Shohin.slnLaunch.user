@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Nuevo perfil",
+    "Projects": [
+      {
+        "Path": "src\\Shohin.Api\\Shohin.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\Shohin.Worker.Local\\Shohin.Worker.Local.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

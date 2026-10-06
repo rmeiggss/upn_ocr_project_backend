@@ -13,6 +13,12 @@ public class TicketDto
     public string? Observaciones { get; set; }
     public DateTime FechaCreacion { get; set; }
     public string UsuarioCreacion { get; set; } = string.Empty;
+    public DateTime? FechaDesde { get; set; }
+    public DateTime? FechaHasta { get; set; }
+    public string? NumeroCajaArchivador { get; set; }
+    public string? RucProveedor { get; set; }
+    public string? RazonSocialProveedor { get; set; }
+    public string? Prioridad { get; set; }
     public int TotalObservados { get; set; }
     public int TotalCorrectos { get; set; }
 }

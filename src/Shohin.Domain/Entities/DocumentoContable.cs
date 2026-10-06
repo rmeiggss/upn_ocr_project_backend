@@ -23,6 +23,11 @@ public class DocumentoContable : AuditableEntity
     public string? NombreArchivo { get; set; }
     public string? HashIntegridad { get; set; } // SHA-256
 
+    // Herencia TPH (NotaCredito) y Metadatos OCR
+    public string? NumeroFacturaReferencia { get; set; }
+    public string? MotivoAnulacion { get; set; }
+    public decimal? ScoreConfianza { get; set; }
+
     // Navegación
     public virtual TicketDigitalizacion? Ticket { get; set; }
     public virtual Parametro TipoDocumentoParametro { get; set; } = null!;
