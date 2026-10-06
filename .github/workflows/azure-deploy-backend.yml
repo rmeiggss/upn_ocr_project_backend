@@ -50,13 +50,70 @@ jobs:
       env:
         HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
 
-    - name: ☁️ Desplegar con Publish Profile (Fallback)
+    - name: 🔍 Validar compatibilidad de Zip Deploy con Publish Profile
       if: github.ref == 'refs/heads/main' && env.HAS_AZ_CREDS != 'true' && env.HAS_PUB_PROFILE == 'true'
+      id: publish_profile_guard
+      run: |
+        profile_json=$(python3 - <<'PY'
+        import json
+        import os
+        import xml.etree.ElementTree as ET
+
+        xml = os.environ["AZURE_FUNCTIONAPP_PUBLISH_PROFILE"]
+        root = ET.fromstring(xml)
+        profiles = root.findall(".//publishProfile")
+        profile = next((p for p in profiles if p.attrib.get("publishMethod") == "MSDeploy"), None) or profiles[0]
+        publish_url = (profile.attrib["publishUrl"].split(",")[0]).split(":")[0]
+        print(json.dumps({
+            "publish_url": publish_url,
+            "username": profile.attrib["userName"],
+            "password": profile.attrib["userPWD"],
+        }))
+        PY
+        )
+
+        pp_host=$(echo "$profile_json" | jq -r '.publish_url')
+        pp_user=$(echo "$profile_json" | jq -r '.username')
+        pp_pass=$(echo "$profile_json" | jq -r '.password')
+
+        echo "::add-mask::$pp_user"
+        echo "::add-mask::$pp_pass"
+
+        if ! settings_json=$(curl -fsS -u "$pp_user:$pp_pass" "https://$pp_host/api/settings"); then
+          echo "::warning::No se pudo consultar app settings por Kudu. Se intentará deploy con publish profile."
+          echo "can_zipdeploy=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        run_from_package=$(echo "$settings_json" | jq -r '.WEBSITE_RUN_FROM_PACKAGE // ""')
+
+        if [[ "$run_from_package" =~ ^https?:// ]]; then
+          echo "::warning::Se detectó WEBSITE_RUN_FROM_PACKAGE como URL. Se omite zipDeploy con publish profile para evitar fallo."
+          echo "can_zipdeploy=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "can_zipdeploy=true" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+        HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        HAS_PUB_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE != '' }}
+        AZURE_FUNCTIONAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+
+    - name: ☁️ Desplegar con Publish Profile (Fallback)
+      if: github.ref == 'refs/heads/main' && env.HAS_AZ_CREDS != 'true' && env.HAS_PUB_PROFILE == 'true' && steps.publish_profile_guard.outputs.can_zipdeploy == 'true'
       uses: Azure/functions-action@v1
       with:
         app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
         package: ./publish
+      env:
+        HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        HAS_PUB_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE != '' }}
+
+    - name: ℹ️ Omitir Deploy por Publish Profile incompatible
+      if: github.ref == 'refs/heads/main' && env.HAS_AZ_CREDS != 'true' && env.HAS_PUB_PROFILE == 'true' && steps.publish_profile_guard.outputs.can_zipdeploy == 'false'
+      run: |
+        echo "Se omitió el deploy con publish profile porque WEBSITE_RUN_FROM_PACKAGE está configurado como URL."
+        echo "Para desplegar desde GitHub Actions, usa credenciales AZURE_CREDENTIALS (recomendado) o elimina WEBSITE_RUN_FROM_PACKAGE URL en el Function App."
       env:
         HAS_AZ_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
         HAS_PUB_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE != '' }}
