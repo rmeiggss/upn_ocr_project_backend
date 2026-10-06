@@ -16,11 +16,20 @@ public class AzureBlobStorageService : IBlobStorageService
     public AzureBlobStorageService(IConfiguration configuration)
     {
         var connectionString = configuration["BlobStorage:ConnectionString"]
-            ?? configuration["AzureWebJobsStorage"]
-            ?? throw new InvalidOperationException("No se encontró la cadena de conexión de Azure Storage.");
+            ?? configuration["BlobStorage__ConnectionString"]
+            ?? configuration.GetConnectionString("BlobStorage")
+            ?? configuration["AzureWebJobsStorage"];
+
+        if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase))
+        {
+            connectionString = configuration["BlobStorage:ConnectionString"] 
+                ?? "UseDevelopmentStorage=true";
+        }
 
         _blobServiceClient = new BlobServiceClient(connectionString);
-        _defaultContainer = configuration["BlobStorage:ContainerName"] ?? "digitalizacion";
+        _defaultContainer = configuration["BlobStorage:ContainerName"]
+            ?? configuration["BlobStorage__ContainerName"]
+            ?? "digitalizacion";
     }
 
     public async Task<string> SubirArchivoAsync(Stream archivoStream, string nombreArchivo, string carpeta = "digitalizacion")

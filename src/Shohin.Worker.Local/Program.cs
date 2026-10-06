@@ -16,11 +16,17 @@ builder.Services.AddHostedService<Worker>();
 var host = builder.Build();
 
 // Sembrar catálogo de parámetros iniciales en la base de datos
-using (var scope = host.Services.CreateScope())
+try
 {
+    using var scope = host.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var jwtService = scope.ServiceProvider.GetRequiredService<IJwtService>();
     await ApplicationDbContextSeed.SeedAsync(dbContext, jwtService);
+}
+catch (Exception ex)
+{
+    var logger = host.Services.GetRequiredService<ILogger<Worker>>();
+    logger.LogWarning("⚠️ No se pudo ejecutar el Seed inicial en la base de datos: {Message}. El agente continuará y reintentará la conexión en segundo plano.", ex.Message);
 }
 
 host.Run();

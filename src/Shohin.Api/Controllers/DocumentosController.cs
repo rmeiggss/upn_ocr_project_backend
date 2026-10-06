@@ -28,8 +28,19 @@ public class DocumentosController : ControllerBase
     }
 
     [HttpGet("ticket/{idTicket}")]
-    public async Task<IActionResult> ObtenerPorTicket(int idTicket)
+    public async Task<IActionResult> ObtenerPorTicket(
+        int idTicket,
+        [FromQuery] int? pagina = null,
+        [FromQuery] int? tamanoPagina = null,
+        [FromQuery] string? filtro = null)
     {
+        if (pagina.HasValue)
+        {
+            var paginado = await _validacionService.ObtenerDocumentosPorTicketPaginadoAsync(
+                idTicket, pagina.Value, tamanoPagina ?? 10, filtro);
+            return Ok(paginado);
+        }
+
         var result = await _validacionService.ObtenerDocumentosPorTicketAsync(idTicket);
         return Ok(result);
     }
@@ -42,6 +53,21 @@ public class DocumentosController : ControllerBase
             return NotFound(result);
 
         return Ok(result);
+    }
+
+    [HttpGet("{idDocumento}/archivo")]
+    public async Task<IActionResult> DescargarArchivoPorId(int idDocumento)
+    {
+        var docResult = await _validacionService.ObtenerDocumentoPorIdAsync(idDocumento);
+        if (!docResult.Exito || docResult.Datos == null || string.IsNullOrWhiteSpace(docResult.Datos.RutaBlobStorage))
+            return NotFound(ApiResponse<string>.Fail("Documento o ruta de almacenamiento no encontrada."));
+
+        var stream = await _blobService.DescargarArchivoAsync(docResult.Datos.RutaBlobStorage);
+        if (stream == null)
+            return NotFound(ApiResponse<string>.Fail("El archivo no se encuentra disponible en Azure Blob Storage."));
+
+        Response.Headers.Append("Content-Disposition", $"inline; filename=\"{docResult.Datos.NombreArchivo ?? "documento.pdf"}\"");
+        return File(stream, "application/pdf");
     }
 
     // CUS-01: Carga y procesamiento OCR

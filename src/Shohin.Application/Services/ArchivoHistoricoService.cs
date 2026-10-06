@@ -16,10 +16,12 @@ namespace Shohin.Application.Services;
 public class ArchivoHistoricoService
 {
     private readonly IApplicationDbContext _context;
+    private readonly IErpAntiguoService _erpAntiguoService;
 
-    public ArchivoHistoricoService(IApplicationDbContext context)
+    public ArchivoHistoricoService(IApplicationDbContext context, IErpAntiguoService erpAntiguoService)
     {
         _context = context;
+        _erpAntiguoService = erpAntiguoService;
     }
 
     public async Task<ApiResponse<List<DocumentoDto>>> ConsultarHistoricoAsync(ConsultaHistoricoFiltroDto filtro)
@@ -68,11 +70,14 @@ public class ArchivoHistoricoService
                 SerieComprobante = d.SerieComprobante,
                 NumeroComprobante = d.NumeroComprobante,
                 FechaEmision = d.FechaEmision,
+                MontoSubTotal = d.MontoSubTotal,
+                MontoIgv = d.MontoIgv,
                 MontoTotal = d.MontoTotal,
                 Moneda = d.Moneda,
                 Estado = d.EstadoParametro.Clave,
                 RutaBlobStorage = d.RutaBlobStorage,
                 NombreArchivo = d.NombreArchivo,
+                OrigenDatos = "LOCAL",
                 FechaCreacion = d.FechaCreacion,
                 Campos = d.CamposExtraidos.Select(c => new CampoOcrDto
                 {
@@ -86,24 +91,55 @@ public class ArchivoHistoricoService
             })
             .ToListAsync();
 
+        // Consulta federada al actor secundario <<Sistema>> ERP Antiguo
+        var docsLegacy = await _erpAntiguoService.ConsultarDocumentosLegacyAsync(
+            filtro.RucEmisor,
+            filtro.CodigoTicket, // O serie/número
+            filtro.TipoDocumento
+        );
+
+        if (docsLegacy.Any())
+        {
+            resultados.AddRange(docsLegacy);
+        }
+
         return ApiResponse<List<DocumentoDto>>.Ok(resultados);
     }
 
-    // Si el documento no se encuentra en el archivo histórico digital, se crea un ticket de búsqueda física en almacén
+    // Si el documento no se encuentra en el archivo histórico digital ni en el ERP Antiguo, se crea un ticket de búsqueda física en almacén (CUS-03)
     public async Task<ApiResponse<TicketDto>> CrearSolicitudBusquedaFisicaAsync(SolicitudBusquedaFisicaDto solicitud)
     {
         var estadoPendiente = await _context.Parametros
             .FirstAsync(p => p.Grupo == ParametroConstantes.Grupos.EstadoTicket && p.Clave == ParametroConstantes.EstadoTicket.Pendiente);
 
-        var codigoTicket = $"SOL-BUSQ-{DateTime.UtcNow:yyyyMMdd}-{new Random().Next(100, 999)}";
-        var obs = $"Solicitud de búsqueda física para RUC: {solicitud.RucEmisor}, Serie/N°: {solicitud.SerieNumero ?? "N/A"}, Período: {solicitud.AnioPeriodo ?? "N/A"}. Motivo: {solicitud.MotivoSolicitud}";
+        var prioridadParam = !string.IsNullOrWhiteSpace(solicitud.Prioridad)
+            ? await _context.Parametros.FirstOrDefaultAsync(p => p.Grupo == "PRIORIDAD_TICKET" && p.Clave == solicitud.Prioridad)
+            : null;
+
+        var tipoDocParam = !string.IsNullOrWhiteSpace(solicitud.TipoDocumento)
+            ? await _context.Parametros.FirstOrDefaultAsync(p => p.Grupo == ParametroConstantes.Grupos.TipoDocumento && p.Clave == solicitud.TipoDocumento)
+            : null;
+
+        var codigoTicket = $"TK-{DateTime.UtcNow:yyyy}-{new Random().Next(1000, 9999)}";
+        var obs = !string.IsNullOrWhiteSpace(solicitud.MotivoSolicitud)
+            ? solicitud.MotivoSolicitud
+            : $"Solicitud de búsqueda física para RUC: {solicitud.RucEmisor}, Serie/N°: {solicitud.SerieNumero ?? "N/A"}";
 
         var ticket = new TicketDigitalizacion
         {
             CodigoTicket = codigoTicket,
             IdEstadoParametro = estadoPendiente.IdParametro,
-            TotalDocumentosEsperados = 1,
+            TotalDocumentosEsperados = (solicitud.TotalDocumentosEsperados.HasValue && solicitud.TotalDocumentosEsperados.Value > 0)
+                ? solicitud.TotalDocumentosEsperados.Value
+                : 1,
             TotalDocumentosProcesados = 0,
+            FechaDesde = solicitud.FechaDesde,
+            FechaHasta = solicitud.FechaHasta,
+            IdPrioridadParametro = prioridadParam?.IdParametro,
+            NumeroCajaArchivador = solicitud.NumeroCajaArchivador,
+            RucProveedor = solicitud.RucEmisor,
+            RazonSocialProveedor = solicitud.RazonSocial,
+            IdTipoDocumentoParametro = tipoDocParam?.IdParametro,
             Observaciones = obs
         };
 
@@ -123,3 +159,4 @@ public class ArchivoHistoricoService
         }, "Solicitud de búsqueda física registrada y asignada al personal de archivo.");
     }
 }
+

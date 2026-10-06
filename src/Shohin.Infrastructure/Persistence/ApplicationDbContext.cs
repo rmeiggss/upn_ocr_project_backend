@@ -26,8 +26,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RevisionTicket> Revisiones => Set<RevisionTicket>();
     public DbSet<DocumentoContable> Documentos => Set<DocumentoContable>();
     public DbSet<CampoExtraidoOCR> CamposOCR => Set<CampoExtraidoOCR>();
+    public DbSet<RegistroReporte> Reportes => Set<RegistroReporte>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+
     {
         var entries = ChangeTracker.Entries<AuditableEntity>();
         var currentUsername = _currentUserService.GetCurrentUsername() ?? "SYSTEM";
@@ -85,6 +87,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.PasswordHash).HasMaxLength(255).IsRequired();
             entity.Property(e => e.Nombres).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Correo).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Area).HasMaxLength(100);
+            entity.Property(e => e.NumeroFotocheck).HasMaxLength(50);
+            entity.Property(e => e.EntidadGubernamental).HasMaxLength(100);
+            entity.Property(e => e.CodigoAuditor).HasMaxLength(50);
             entity.HasIndex(e => e.CodigoUsuario).IsUnique();
 
             entity.HasOne(e => e.Rol)
@@ -104,12 +110,25 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.ToTable("TicketDigitalizacion");
             entity.HasKey(e => e.IdTicket);
             entity.Property(e => e.CodigoTicket).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.RucProveedor).HasMaxLength(20);
+            entity.Property(e => e.RazonSocialProveedor).HasMaxLength(200);
+            entity.Property(e => e.NumeroCajaArchivador).HasMaxLength(50);
             entity.Property(e => e.Observaciones).HasMaxLength(500);
             entity.HasIndex(e => e.CodigoTicket).IsUnique();
 
             entity.HasOne(e => e.EstadoParametro)
                 .WithMany(p => p.Tickets)
                 .HasForeignKey(e => e.IdEstadoParametro)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.PrioridadParametro)
+                .WithMany()
+                .HasForeignKey(e => e.IdPrioridadParametro)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.TipoDocumentoParametro)
+                .WithMany()
+                .HasForeignKey(e => e.IdTipoDocumentoParametro)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -148,6 +167,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.RutaBlobStorage).HasMaxLength(500);
             entity.Property(e => e.NombreArchivo).HasMaxLength(255);
             entity.Property(e => e.HashIntegridad).HasMaxLength(64);
+            entity.Property(e => e.NumeroFacturaReferencia).HasMaxLength(50);
+            entity.Property(e => e.MotivoAnulacion).HasMaxLength(250);
+            entity.Property(e => e.ScoreConfianza).HasPrecision(5, 2);
 
             entity.HasOne(e => e.Ticket)
                 .WithMany(t => t.Documentos)
@@ -180,5 +202,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .HasForeignKey(e => e.IdDocumento)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        // 8. RegistroReporte (CUS-04 Auditoría de Reportes)
+        modelBuilder.Entity<RegistroReporte>(entity =>
+        {
+            entity.ToTable("RegistroReporte");
+            entity.HasKey(e => e.IdReporte);
+            entity.Property(e => e.FormatoArchivo).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.FiltroUsuario).HasMaxLength(500);
+
+            entity.HasOne(e => e.Usuario)
+                .WithMany(u => u.Reportes)
+                .HasForeignKey(e => e.IdUsuario)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
     }
 }

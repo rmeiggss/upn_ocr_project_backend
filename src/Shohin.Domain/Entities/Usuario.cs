@@ -14,8 +14,16 @@ public class Usuario : AuditableEntity
     public string Correo { get; set; } = string.Empty;
     public bool Estado { get; set; } = true;
 
+    // Propiedades de Herencia TPH (PersonalInterno / AuditorExterno)
+    public string? Area { get; set; }
+    public string? NumeroFotocheck { get; set; }
+    public string? EntidadGubernamental { get; set; }
+    public string? CodigoAuditor { get; set; }
+
     // Navegación
     public virtual Rol Rol { get; set; } = null!;
     public virtual Parametro TipoUsuarioParametro { get; set; } = null!;
     public virtual ICollection<RevisionTicket> Revisiones { get; set; } = new List<RevisionTicket>();
+    public virtual ICollection<RegistroReporte> Reportes { get; set; } = new List<RegistroReporte>();
 }
+

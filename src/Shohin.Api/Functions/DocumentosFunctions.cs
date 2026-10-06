@@ -31,6 +31,14 @@ public class DocumentosFunctions
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "documentos/ticket/{idTicket:int}")] HttpRequest req,
         int idTicket)
     {
+        if (int.TryParse(req.Query["pagina"], out int pagina))
+        {
+            int tamanoPagina = int.TryParse(req.Query["tamanoPagina"], out int tp) ? tp : 10;
+            string? filtro = req.Query["filtro"];
+            var paginado = await _validacionService.ObtenerDocumentosPorTicketPaginadoAsync(idTicket, pagina, tamanoPagina, filtro);
+            return new OkObjectResult(paginado);
+        }
+
         var result = await _validacionService.ObtenerDocumentosPorTicketAsync(idTicket);
         return new OkObjectResult(result);
     }
@@ -45,6 +53,23 @@ public class DocumentosFunctions
             return new NotFoundObjectResult(result);
 
         return new OkObjectResult(result);
+    }
+
+    [Function("Documentos_DescargarArchivoPorId")]
+    public async Task<IActionResult> DescargarArchivoPorId(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "head", Route = "documentos/{idDocumento:int}/archivo")] HttpRequest req,
+        int idDocumento)
+    {
+        var docResult = await _validacionService.ObtenerDocumentoPorIdAsync(idDocumento);
+        if (!docResult.Exito || docResult.Datos == null || string.IsNullOrWhiteSpace(docResult.Datos.RutaBlobStorage))
+            return new NotFoundObjectResult(ApiResponse<string>.Fail("Documento o ruta de almacenamiento no encontrada."));
+
+        var stream = await _blobService.DescargarArchivoAsync(docResult.Datos.RutaBlobStorage);
+        if (stream == null)
+            return new NotFoundObjectResult(ApiResponse<string>.Fail("El archivo no se encuentra disponible en Azure Blob Storage."));
+
+        req.HttpContext.Response.Headers.Append("Content-Disposition", $"inline; filename=\"{docResult.Datos.NombreArchivo ?? "documento.pdf"}\"");
+        return new FileStreamResult(stream, "application/pdf");
     }
 
     [Function("Documentos_SubirYProcesar")]
@@ -103,7 +128,7 @@ public class DocumentosFunctions
 
     [Function("Documentos_DescargarArchivo")]
     public async Task<IActionResult> DescargarArchivo(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "documentos/archivo/{**ruta}")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", "head", Route = "documentos/archivo/{**ruta}")] HttpRequest req,
         string ruta)
     {
         var stream = await _blobService.DescargarArchivoAsync(ruta);

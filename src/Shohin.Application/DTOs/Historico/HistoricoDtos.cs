@@ -19,7 +19,14 @@ public class ConsultaHistoricoFiltroDto
 public class SolicitudBusquedaFisicaDto
 {
     public string RucEmisor { get; set; } = string.Empty;
+    public string? RazonSocial { get; set; }
     public string? SerieNumero { get; set; }
-    public string? AnioPeriodo { get; set; }
+    public string? TipoDocumento { get; set; } = "FACTURA";
+    public DateTime? FechaDesde { get; set; }
+    public DateTime? FechaHasta { get; set; }
+    public string? Prioridad { get; set; } = "ALTA";
+    public string? NumeroCajaArchivador { get; set; }
+    public int? TotalDocumentosEsperados { get; set; }
     public string MotivoSolicitud { get; set; } = string.Empty;
 }
+

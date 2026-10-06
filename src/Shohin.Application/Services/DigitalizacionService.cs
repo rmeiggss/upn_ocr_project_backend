@@ -34,6 +34,7 @@ public class DigitalizacionService
     {
         var tickets = await _context.Tickets
             .Include(t => t.EstadoParametro)
+            .Include(t => t.PrioridadParametro)
             .Include(t => t.Documentos)
                 .ThenInclude(d => d.EstadoParametro)
             .OrderByDescending(t => t.FechaCreacion)
@@ -47,6 +48,12 @@ public class DigitalizacionService
                 Observaciones = t.Observaciones,
                 FechaCreacion = t.FechaCreacion,
                 UsuarioCreacion = t.UsuarioCreacion,
+                FechaDesde = t.FechaDesde,
+                FechaHasta = t.FechaHasta,
+                NumeroCajaArchivador = t.NumeroCajaArchivador,
+                RucProveedor = t.RucProveedor,
+                RazonSocialProveedor = t.RazonSocialProveedor,
+                Prioridad = t.PrioridadParametro != null ? t.PrioridadParametro.Clave : null,
                 TotalObservados = t.Documentos.Count(d => d.EstadoParametro.Clave == ParametroConstantes.EstadoDocumento.Observado),
                 TotalCorrectos = t.Documentos.Count(d => d.EstadoParametro.Clave == ParametroConstantes.EstadoDocumento.Correcto)
             })
@@ -180,6 +187,8 @@ public class DigitalizacionService
             SerieComprobante = doc.SerieComprobante,
             NumeroComprobante = doc.NumeroComprobante,
             FechaEmision = doc.FechaEmision,
+            MontoSubTotal = doc.MontoSubTotal,
+            MontoIgv = doc.MontoIgv,
             MontoTotal = doc.MontoTotal,
             Moneda = doc.Moneda,
             Estado = estadoDocParam.Clave,

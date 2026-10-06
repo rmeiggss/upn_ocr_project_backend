@@ -42,6 +42,8 @@ public class ValidacionService
                 SerieComprobante = d.SerieComprobante,
                 NumeroComprobante = d.NumeroComprobante,
                 FechaEmision = d.FechaEmision,
+                MontoSubTotal = d.MontoSubTotal,
+                MontoIgv = d.MontoIgv,
                 MontoTotal = d.MontoTotal,
                 Moneda = d.Moneda,
                 Estado = d.EstadoParametro.Clave,
@@ -61,6 +63,82 @@ public class ValidacionService
             .ToListAsync();
 
         return ApiResponse<List<DocumentoDto>>.Ok(documentos);
+    }
+
+    public async Task<ApiResponse<DocumentoPaginadoDto>> ObtenerDocumentosPorTicketPaginadoAsync(
+        int idTicket,
+        int pagina = 1,
+        int tamanoPagina = 10,
+        string? filtro = null)
+    {
+        var query = _context.Documentos
+            .Include(d => d.Ticket)
+            .Include(d => d.TipoDocumentoParametro)
+            .Include(d => d.EstadoParametro)
+            .Include(d => d.CamposExtraidos)
+            .Where(d => d.IdTicket == idTicket);
+
+        if (!string.IsNullOrWhiteSpace(filtro))
+        {
+            var f = filtro.Trim().ToLower();
+            query = query.Where(d =>
+                (d.SerieComprobante != null && d.SerieComprobante.ToLower().Contains(f)) ||
+                (d.NumeroComprobante != null && d.NumeroComprobante.ToLower().Contains(f)) ||
+                (d.RucEmisor != null && d.RucEmisor.ToLower().Contains(f)) ||
+                (d.RazonSocial != null && d.RazonSocial.ToLower().Contains(f)) ||
+                (d.NombreArchivo != null && d.NombreArchivo.ToLower().Contains(f)));
+        }
+
+        var totalRegistros = await query.CountAsync();
+
+        if (pagina < 1) pagina = 1;
+        if (tamanoPagina < 1) tamanoPagina = 10;
+
+        var items = await query
+            .OrderBy(d => d.IdDocumento)
+            .Skip((pagina - 1) * tamanoPagina)
+            .Take(tamanoPagina)
+            .Select(d => new DocumentoDto
+            {
+                IdDocumento = d.IdDocumento,
+                IdTicket = d.IdTicket,
+                CodigoTicket = d.Ticket != null ? d.Ticket.CodigoTicket : string.Empty,
+                TipoDocumento = d.TipoDocumentoParametro.Clave,
+                RucEmisor = d.RucEmisor,
+                RazonSocial = d.RazonSocial,
+                SerieComprobante = d.SerieComprobante,
+                NumeroComprobante = d.NumeroComprobante,
+                FechaEmision = d.FechaEmision,
+                MontoSubTotal = d.MontoSubTotal,
+                MontoIgv = d.MontoIgv,
+                MontoTotal = d.MontoTotal,
+                Moneda = d.Moneda,
+                Estado = d.EstadoParametro.Clave,
+                RutaBlobStorage = d.RutaBlobStorage,
+                NombreArchivo = d.NombreArchivo,
+                FechaCreacion = d.FechaCreacion,
+                Campos = d.CamposExtraidos.Select(c => new CampoOcrDto
+                {
+                    IdCampoExtraido = c.IdCampoExtraido,
+                    NombreCampo = c.NombreCampo,
+                    ValorExtraido = c.ValorExtraido,
+                    ValorCorregido = c.ValorCorregido,
+                    NivelConfianza = c.NivelConfianza,
+                    EsCorregido = c.EsCorregido
+                }).ToList()
+            })
+            .ToListAsync();
+
+        var paginado = new DocumentoPaginadoDto
+        {
+            Items = items,
+            TotalRegistros = totalRegistros,
+            Pagina = pagina,
+            TamanoPagina = tamanoPagina,
+            TotalPaginas = tamanoPagina > 0 ? (int)Math.Ceiling((double)totalRegistros / tamanoPagina) : 1
+        };
+
+        return ApiResponse<DocumentoPaginadoDto>.Ok(paginado);
     }
 
     public async Task<ApiResponse<DocumentoDto>> ObtenerDocumentoPorIdAsync(int idDocumento)
@@ -86,6 +164,8 @@ public class ValidacionService
             SerieComprobante = d.SerieComprobante,
             NumeroComprobante = d.NumeroComprobante,
             FechaEmision = d.FechaEmision,
+            MontoSubTotal = d.MontoSubTotal,
+            MontoIgv = d.MontoIgv,
             MontoTotal = d.MontoTotal,
             Moneda = d.Moneda,
             Estado = d.EstadoParametro.Clave,
@@ -170,11 +250,13 @@ public class ValidacionService
         if (doc == null)
             return ApiResponse<bool>.Fail("Documento no encontrado.");
 
+        var decision = request.ObtenerDecision();
+
         var estado = await _context.Parametros
-            .FirstOrDefaultAsync(p => p.Grupo == ParametroConstantes.Grupos.EstadoDocumento && p.Clave == request.Decision);
+            .FirstOrDefaultAsync(p => p.Grupo == ParametroConstantes.Grupos.EstadoDocumento && p.Clave == decision);
 
         if (estado == null)
-            return ApiResponse<bool>.Fail($"Estado inválido: {request.Decision}");
+            return ApiResponse<bool>.Fail($"Estado inválido: {decision}");
 
         doc.IdEstadoParametro = estado.IdParametro;
 
@@ -191,8 +273,8 @@ public class ValidacionService
                     IdUsuario = usuario.IdUsuario,
                     FechaInicioRevision = DateTime.UtcNow,
                     FechaFinRevision = DateTime.UtcNow,
-                    ResultadoAprobacion = request.Decision,
-                    Observaciones = request.MotivoObservacion
+                    ResultadoAprobacion = decision,
+                    Observaciones = request.MotivoObservacion ?? request.Comentarios
                 };
                 _context.Revisiones.Add(revision);
             }
@@ -200,6 +282,6 @@ public class ValidacionService
 
         await _context.SaveChangesAsync();
 
-        return ApiResponse<bool>.Ok(true, $"Documento actualizado a estado '{request.Decision}'.");
+        return ApiResponse<bool>.Ok(true, $"Documento actualizado a estado '{decision}'.");
     }
 }

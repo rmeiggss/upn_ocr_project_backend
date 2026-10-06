@@ -14,6 +14,8 @@ public interface IApplicationDbContext
     DbSet<RevisionTicket> Revisiones { get; }
     DbSet<DocumentoContable> Documentos { get; }
     DbSet<CampoExtraidoOCR> CamposOCR { get; }
+    DbSet<RegistroReporte> Reportes { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
 }
